@@ -6,6 +6,8 @@
 
 #define ALIGNMENT sizeof(void *)
 
+// TODO: Add an explanatory comment at the top
+
 class LinearAllocator
 {
     private:
@@ -17,6 +19,7 @@ class LinearAllocator
         LinearAllocator(size_t);
         ~LinearAllocator();
         void *alloc(size_t);
+        void *alloc_noalign(size_t);
         void resize(size_t);
         void reset();
         void *get_buffer();
@@ -50,6 +53,16 @@ void *LinearAllocator::alloc(size_t size)
     {
         m_offset = corrected_offset + size;
         return &m_buffer[corrected_offset];
+    }
+    return nullptr; // Out of space
+}
+
+void *LinearAllocator::alloc_noalign(size_t size)
+{
+    if (size <= m_capacity - m_offset)
+    {
+        m_offset += size;
+        return &m_buffer[m_offset - size];
     }
     return nullptr; // Out of space
 }
