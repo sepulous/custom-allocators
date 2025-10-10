@@ -1,3 +1,14 @@
+/*
+    The linear allocator (aka "bump allocator") is the simplest possible allocator.
+
+    Allocation is performed in O(1) time using only arithmetic.
+
+    Only one buffer is utilized, which does not grow dynamically, and must be manually resized by the user.
+
+    The linear allocator is often conflated with the arena allocator, but the latter is actually a generalization
+    which grows dynamically by either managing multiple buffers, or copying the existing buffer into a larger one.
+*/
+
 #pragma once
 
 #include <cstdlib>
@@ -5,8 +16,6 @@
 #include <cassert>
 
 #define ALIGNMENT sizeof(void *)
-
-// TODO: Add an explanatory comment at the top
 
 class LinearAllocator
 {
