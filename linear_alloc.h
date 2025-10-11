@@ -31,9 +31,6 @@ class LinearAllocator
         void *alloc_noalign(size_t);
         void resize(size_t);
         void free();
-        void *get_buffer();
-        size_t get_offset();
-        size_t get_capacity();
 };
 
 LinearAllocator::LinearAllocator(size_t capacity)
@@ -91,19 +88,4 @@ void LinearAllocator::resize(size_t capacity)
 void LinearAllocator::free()
 {
     m_offset = 0;
-}
-
-void *LinearAllocator::get_buffer()
-{
-    return m_buffer;
-}
-
-size_t LinearAllocator::get_offset()
-{
-    return m_offset;
-}
-
-size_t LinearAllocator::get_capacity()
-{
-    return m_capacity;
 }
