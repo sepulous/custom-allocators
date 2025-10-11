@@ -5,7 +5,7 @@
 
     Only one buffer is utilized, which does not grow dynamically, and must be manually resized by the user.
 
-    The linear allocator is often conflated with the arena allocator, but the latter is actually a generalization
+    The linear allocator is often conflated with the arena allocator, but the latter is actually a higher-level system
     which grows dynamically by either managing multiple buffers, or copying the existing buffer into a larger one.
 */
 
@@ -30,7 +30,7 @@ class LinearAllocator
         void *alloc(size_t);
         void *alloc_noalign(size_t);
         void resize(size_t);
-        void reset();
+        void free();
         void *get_buffer();
         size_t get_offset();
         size_t get_capacity();
@@ -45,7 +45,7 @@ LinearAllocator::LinearAllocator(size_t capacity)
 
 LinearAllocator::~LinearAllocator()
 {
-    free(m_buffer);
+    std::free(m_buffer);
 }
 
 void *LinearAllocator::alloc(size_t size)
@@ -83,12 +83,12 @@ void LinearAllocator::resize(size_t capacity)
 
     auto new_buffer = (unsigned char *)malloc(capacity);
     memcpy(new_buffer, m_buffer, m_capacity - m_offset + 1);
-    free(m_buffer);
+    std::free(m_buffer);
     m_buffer = new_buffer;
     m_capacity = capacity;
 }
 
-void LinearAllocator::reset()
+void LinearAllocator::free()
 {
     m_offset = 0;
 }
