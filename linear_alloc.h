@@ -1,7 +1,7 @@
 /*
     The linear allocator (aka "bump allocator") is the simplest possible allocator.
 
-    Allocation is performed in O(1) time using only arithmetic.
+    Allocation is performed in amortized O(1) time.
 
     Only one buffer is utilized, which does not grow dynamically, and must be manually resized by the user.
 
@@ -20,9 +20,9 @@
 class LinearAllocator
 {
     private:
-        unsigned char *m_buffer;
         size_t m_offset;
         size_t m_capacity;
+        unsigned char *m_buffer;
 
     public:
         LinearAllocator(size_t);
@@ -35,9 +35,9 @@ class LinearAllocator
 
 LinearAllocator::LinearAllocator(size_t capacity)
 {
-    m_buffer = (unsigned char *)malloc(capacity);
     m_offset = 0;
     m_capacity = capacity;
+    m_buffer = static_cast<unsigned char*>(malloc(capacity));
 }
 
 LinearAllocator::~LinearAllocator()
@@ -78,8 +78,8 @@ void LinearAllocator::resize(size_t capacity)
     if (capacity <= m_capacity)
         return;
 
-    auto new_buffer = (unsigned char *)malloc(capacity);
-    memcpy(new_buffer, m_buffer, m_capacity - m_offset + 1);
+    unsigned char *new_buffer = static_cast<unsigned char *>(malloc(capacity));
+    memcpy(new_buffer, m_buffer, m_offset);
     std::free(m_buffer);
     m_buffer = new_buffer;
     m_capacity = capacity;
