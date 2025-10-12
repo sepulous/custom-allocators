@@ -1,8 +1,5 @@
 /*
     The arena allocator is a generalization of the linear allocator that can grow dynamically.
-        - At risk of being pedantic, it isn't a generalization in the strictest sense of the word.
-          For that to be true, it would have to be parameterized in such a way that it can literally
-          be reduced to a linear allocator. Whatever.
 
     Allocation is performed in amortized O(1) time, assuming the current block has enough space.
 
