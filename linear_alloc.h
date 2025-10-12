@@ -6,7 +6,7 @@
     Only one buffer is utilized, which does not grow dynamically, and must be manually resized by the user.
 
     The linear allocator is often conflated with the arena allocator, but the latter is actually a higher-level system
-    which grows dynamically by either managing multiple buffers, or copying the existing buffer into a larger one.
+    which grows dynamically.
 */
 
 #pragma once
