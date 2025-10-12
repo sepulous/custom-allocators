@@ -79,12 +79,7 @@ void *ArenaAllocator::alloc(size_t size)
 {
     assert((ALIGNMENT & (ALIGNMENT-1)) == 0); // Alignment must be a power of two
 
-    // Alignment correction
-    auto boundary_gap = ((uintptr_t)m_current->buffer + m_current->offset) & (ALIGNMENT-1); // A % B == A & (B-1)  if B is a power of two (and A >= 0)
-    size_t corrected_offset = m_current->offset;
-    if (boundary_gap != 0)
-        corrected_offset += ALIGNMENT - boundary_gap;
-
+    size_t corrected_offset = (m_current->offset + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
     if (size > m_current->capacity - corrected_offset)
     {
         ArenaBlock *new_block = static_cast<ArenaBlock *>(malloc(sizeof(ArenaBlock) + size));

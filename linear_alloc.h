@@ -31,6 +31,11 @@ class LinearAllocator
         void *alloc_noalign(size_t);
         void resize(size_t);
         void free();
+
+        size_t get_offset()
+        {
+            return m_offset;
+        }
 };
 
 LinearAllocator::LinearAllocator(size_t capacity)
@@ -49,12 +54,7 @@ void *LinearAllocator::alloc(size_t size)
 {
     assert((ALIGNMENT & (ALIGNMENT-1)) == 0); // Alignment must be a power of two
 
-    // Alignment correction
-    auto boundary_gap = ((uintptr_t)m_buffer + m_offset) & (ALIGNMENT-1); // A % B == A & (B-1)  if B is a power of two (and A >= 0)
-    size_t corrected_offset = m_offset;
-    if (boundary_gap != 0)
-        corrected_offset += ALIGNMENT - boundary_gap;
-
+    size_t corrected_offset = (m_offset + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
     if (size <= m_capacity - corrected_offset)
     {
         m_offset = corrected_offset + size;
