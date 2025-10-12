@@ -93,9 +93,9 @@ void *ArenaAllocator::alloc(size_t size)
     if (size > m_current->capacity - corrected_offset)
     {
         ArenaBlock *new_block = static_cast<ArenaBlock *>(malloc(sizeof(ArenaBlock) + size));
-        new_block->next = nullptr;
+        new_block->next = m_current->next;
         new_block->offset = 0;
-        new_block->capacity = (size_t)std::max(m_current->capacity * 1.5, (double)size);
+        new_block->capacity = static_cast<size_t>(std::max(m_current->capacity * 1.5, (double)size));
         new_block->buffer = reinterpret_cast<unsigned char *>(new_block + 1);
         m_current->next = new_block;
         m_current = new_block;
@@ -115,10 +115,10 @@ void *ArenaAllocator::alloc_noalign(size_t size)
 {
     if (size > m_current->capacity - m_current->offset)
     {
-        ArenaBlock *new_block = (ArenaBlock *)malloc(sizeof(ArenaBlock));
-        new_block->next = nullptr;
+        ArenaBlock *new_block = static_cast<ArenaBlock *>(malloc(sizeof(ArenaBlock) + size));
+        new_block->next = m_current->next;
         new_block->offset = 0;
-        new_block->capacity = (size_t)std::max(m_current->capacity * 1.5, (double)size);
+        new_block->capacity = static_cast<size_t>(std::max(m_current->capacity * 1.5, static_cast<double>(size)));
         new_block->buffer = reinterpret_cast<unsigned char *>(new_block + 1);
         m_current->next = new_block;
         m_current = new_block;
@@ -161,7 +161,7 @@ void *ArenaAllocator::pack(size_t *packed_size)
     if (m_total_size == 0)
         return nullptr;
 
-    unsigned char *packed_buffer = (unsigned char *)malloc(m_total_size);
+    unsigned char *packed_buffer = static_cast<unsigned char *>(malloc(m_total_size));
     *packed_size = m_total_size;
 
     ArenaBlock *block = m_head;
