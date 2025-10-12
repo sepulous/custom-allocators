@@ -54,8 +54,6 @@ class ArenaAllocator
         void reset();
         void free();
         void *pack(size_t*);
-
-        void print_debug();
 };
 
 ArenaAllocator::ArenaAllocator(size_t initial_capacity)
@@ -174,19 +172,4 @@ void *ArenaAllocator::pack(size_t *packed_size)
     }
 
     return packed_buffer;
-}
-
-void ArenaAllocator::print_debug()
-{
-    printf("Total size: %i\n\n", m_total_size);
-    ArenaBlock *block = m_head;
-    int i = 1;
-    while (block)
-    {
-        printf("Block %i\n", i);
-        printf("\tOffset: %i\n", block->offset);
-        printf("\tCapacity: %i\n\n", block->capacity);
-        block = block->next;
-        i++;
-    }
 }
