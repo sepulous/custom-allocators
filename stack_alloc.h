@@ -34,6 +34,7 @@ class StackAllocator
 
 StackAllocator::StackAllocator(size_t capacity)
 {
+    assert((ALIGNMENT & (ALIGNMENT-1)) == 0); // Alignment must be a power of two
     m_offset = 0;
     m_capacity = capacity;
     m_buffer = static_cast<unsigned char*>(malloc(capacity));
@@ -46,8 +47,6 @@ StackAllocator::~StackAllocator()
 
 void *StackAllocator::alloc(size_t size)
 {
-    assert((ALIGNMENT & (ALIGNMENT-1)) == 0); // Alignment must be a power of two
-
     size_t corrected_offset = (m_offset + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
     if (size <= m_capacity - corrected_offset)
     {

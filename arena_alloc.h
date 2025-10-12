@@ -55,6 +55,7 @@ class ArenaAllocator
 
 ArenaAllocator::ArenaAllocator(size_t initial_capacity)
 {
+    assert((ALIGNMENT & (ALIGNMENT-1)) == 0); // Alignment must be a power of two
     ArenaBlock *block = static_cast<ArenaBlock *>(malloc(sizeof(ArenaBlock) + initial_capacity));
     block->next = nullptr;
     block->offset = 0;
@@ -77,8 +78,6 @@ ArenaAllocator::~ArenaAllocator()
 
 void *ArenaAllocator::alloc(size_t size)
 {
-    assert((ALIGNMENT & (ALIGNMENT-1)) == 0); // Alignment must be a power of two
-
     size_t corrected_offset = (m_current->offset + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
     if (size > m_current->capacity - corrected_offset)
     {
