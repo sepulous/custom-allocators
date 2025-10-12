@@ -1,15 +1,25 @@
 /*
     The arena allocator is a generalization of the linear allocator that can grow dynamically.
+        - At risk of being pedantic, it isn't a generalization in the strictest sense of the word.
+          For that to be true, it would have to be parameterized in such a way that it can literally
+          be reduced to a linear allocator. Whatever.
 
-    Allocation is performed in O(1) time using only arithmetic.
+    Allocation is performed in amortized O(1) time, assuming the current block has enough space.
 
-    In this implementation, dynamic growth is handled by creating new blocks. In some implementations,
-    this is instead handled by creating a larger block and copying the data over.
+    Two functions are provided to "reset" the allocator: reset() and free(). reset() simply resets the offset
+    of each block, keeping them in memory. free() actually releases the blocks. Unlike some implementations,
+    here, free() only resets the first block and doesn't release it. This was done to simplify the allocation logic;
+    basically trading semantic purity for performance. Calling the destructor releases all blocks.
 
-    This implementation supports packing all of the data into a contiguous buffer. To do this in O(n)
-    time, rather than O(n^2), with n being the number of blocks, the total size is tracked, which,
-    of course, adds overhead. Additionally, if alloc() is used instead of alloc_noalign(), the
-    packed data will include any padding used to align the addresses, potentially wasting space.
+    In this implementation, dynamic growth is handled by creating new blocks (in some implementations,
+    this is instead handled by creating a larger block and copying the data over). These new blocks
+    are inserted after the current block, which means that if there are already existing blocks after
+    the current block (because reset() was called), a memory leak results, which must be managed by
+    calling free() eventually.
+
+    This implementation supports packing all of the data into a contiguous buffer. To make packing more efficient,
+    the total size is tracked across allocations, which, of course, adds overhead. Also, if alloc() is used instead
+    of alloc_noalign(), the packed data will include any padding used to align the addresses, potentially wasting space.
 */
 
 #pragma once
@@ -24,9 +34,9 @@
 struct ArenaBlock
 {
     ArenaBlock *next;
-    unsigned char *buffer;
     size_t offset;
     size_t capacity;
+    unsigned char *buffer;
 };
 
 class ArenaAllocator
@@ -41,29 +51,32 @@ class ArenaAllocator
         ~ArenaAllocator();
         void *alloc(size_t);
         void *alloc_noalign(size_t);
+        void reset();
         void free();
         void *pack(size_t*);
+
+        void print_debug();
 };
 
 ArenaAllocator::ArenaAllocator(size_t initial_capacity)
 {
-    ArenaBlock *block = (ArenaBlock *)malloc(sizeof(ArenaBlock));
+    ArenaBlock *block = static_cast<ArenaBlock *>(malloc(sizeof(ArenaBlock) + initial_capacity));
     block->next = nullptr;
-    block->buffer = (unsigned char *)malloc(initial_capacity);
     block->offset = 0;
     block->capacity = initial_capacity;
-    m_head = block;
-    m_current = block;
+    block->buffer = reinterpret_cast<unsigned char *>(block + 1);
+    m_head = m_current = block;
     m_total_size = 0;
 }
 
 ArenaAllocator::~ArenaAllocator()
 {
     ArenaBlock *block = m_head;
-    while (block != nullptr)
+    while (block)
     {
-        std::free(block->buffer);
-        block = block->next;
+        ArenaBlock *next = block->next;
+        std::free(block);
+        block = next;
     }
 }
 
@@ -77,102 +90,49 @@ void *ArenaAllocator::alloc(size_t size)
     if (boundary_gap != 0)
         corrected_offset += ALIGNMENT - boundary_gap;
 
-    if (size <= m_current->capacity - corrected_offset)
+    if (size > m_current->capacity - corrected_offset)
     {
-        m_total_size += corrected_offset + size - m_current->offset; // add size + offset shift
-        m_current->offset = corrected_offset + size;
-        return &m_current->buffer[corrected_offset];
-    }
-    else if (m_current->next != nullptr)
-    {
-        if (m_current->next->capacity >= size) // Next block is large enough; use it
-        {
-            m_current = m_current->next;
-            m_current->offset += size;
-            m_total_size += size;
-            return m_current->buffer; // free() was called, so we're at the beginning
-        }
-        else // Next block is too small; create new one
-        {
-            ArenaBlock *new_block = (ArenaBlock *)malloc(sizeof(ArenaBlock));
-            new_block->next = m_current->next;
-            new_block->buffer = (unsigned char *)malloc(size);
-            new_block->offset = 0;
-            new_block->capacity = size;
-            m_current->next = new_block;
-            m_current = new_block;
-            new_block->offset += size;
-            m_total_size += size;
-            return new_block->buffer;
-        }
-    }
-    else // Create new block
-    {
-        ArenaBlock *new_block = (ArenaBlock *)malloc(sizeof(ArenaBlock));
-        size_t new_capacity = (size_t)std::max(m_current->capacity * 1.5, (double)size);
+        ArenaBlock *new_block = static_cast<ArenaBlock *>(malloc(sizeof(ArenaBlock) + size));
         new_block->next = nullptr;
-        new_block->buffer = (unsigned char *)malloc(new_capacity);
         new_block->offset = 0;
-        new_block->capacity = new_capacity;
+        new_block->capacity = (size_t)std::max(m_current->capacity * 1.5, (double)size);
+        new_block->buffer = reinterpret_cast<unsigned char *>(new_block + 1);
         m_current->next = new_block;
         m_current = new_block;
         m_current->offset += size;
         m_total_size += size;
-        return new_block->buffer;
+        return new_block + 1;
+    }
+    else
+    {
+        m_total_size += size + corrected_offset - m_current->offset; // += size + offset shift
+        m_current->offset = corrected_offset + size;
+        return &(m_current->buffer[corrected_offset - size]);
     }
 }
 
 void *ArenaAllocator::alloc_noalign(size_t size)
 {
-    if (size <= m_current->capacity - m_current->offset)
-    {
-        m_total_size += size;
-        m_current->offset += size;
-        return &m_current->buffer[m_current->offset - size];
-    }
-    else if (m_current->next != nullptr)
-    {
-        if (m_current->next->capacity >= size) // Next block is large enough; use it
-        {
-            m_current = m_current->next;
-            m_current->offset += size;
-            m_total_size += size;
-            return m_current->buffer; // free() was called, so we're at the beginning
-        }
-        else // Next block is too small; create new one
-        {
-            ArenaBlock *new_block = (ArenaBlock *)malloc(sizeof(ArenaBlock));
-            new_block->next = m_current->next;
-            new_block->buffer = (unsigned char *)malloc(size);
-            new_block->offset = 0;
-            new_block->capacity = size;
-            m_current->next = new_block;
-            m_current = new_block;
-            new_block->offset += size;
-            m_total_size += size;
-            return new_block->buffer;
-        }
-    }
-    else // Create new block
+    if (size > m_current->capacity - m_current->offset)
     {
         ArenaBlock *new_block = (ArenaBlock *)malloc(sizeof(ArenaBlock));
-        size_t new_capacity = (size_t)std::max(m_current->capacity * 1.5, (double)size);
         new_block->next = nullptr;
-        new_block->buffer = (unsigned char *)malloc(new_capacity);
         new_block->offset = 0;
-        new_block->capacity = new_capacity;
+        new_block->capacity = (size_t)std::max(m_current->capacity * 1.5, (double)size);
+        new_block->buffer = reinterpret_cast<unsigned char *>(new_block + 1);
         m_current->next = new_block;
         m_current = new_block;
-        m_current->offset += size;
-        m_total_size += size;
-        return new_block->buffer;
     }
+
+    m_total_size += size;
+    m_current->offset += size;
+    return &(m_current->buffer[m_current->offset - size]);
 }
 
-void ArenaAllocator::free()
+void ArenaAllocator::reset()
 {
     ArenaBlock *block = m_head;
-    while (block != nullptr)
+    while (block)
     {
         block->offset = 0;
         block = block->next;
@@ -181,14 +141,32 @@ void ArenaAllocator::free()
     m_total_size = 0;
 }
 
+void ArenaAllocator::free()
+{
+    ArenaBlock *block = m_head->next;
+    while (block)
+    {
+        ArenaBlock *next = block->next;
+        std::free(block);
+        block = next;
+    }
+    m_head->offset = 0;
+    m_head->next = nullptr;
+    m_current = m_head;
+    m_total_size = 0;
+}
+
 void *ArenaAllocator::pack(size_t *packed_size)
 {
+    if (m_total_size == 0)
+        return nullptr;
+
     unsigned char *packed_buffer = (unsigned char *)malloc(m_total_size);
     *packed_size = m_total_size;
 
     ArenaBlock *block = m_head;
     unsigned char *packed_buffer_ptr = packed_buffer;
-    while (block != nullptr)
+    while (block)
     {
         memcpy(packed_buffer_ptr, block->buffer, block->offset);
         packed_buffer_ptr += block->offset;
@@ -196,4 +174,19 @@ void *ArenaAllocator::pack(size_t *packed_size)
     }
 
     return packed_buffer;
+}
+
+void ArenaAllocator::print_debug()
+{
+    printf("Total size: %i\n\n", m_total_size);
+    ArenaBlock *block = m_head;
+    int i = 1;
+    while (block)
+    {
+        printf("Block %i\n", i);
+        printf("\tOffset: %i\n", block->offset);
+        printf("\tCapacity: %i\n\n", block->capacity);
+        block = block->next;
+        i++;
+    }
 }
