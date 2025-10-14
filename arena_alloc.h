@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <cassert>
 
 #define DEFAULT_ALIGNMENT alignof(max_align_t)
