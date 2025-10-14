@@ -13,9 +13,10 @@
 
 #include <cstdlib>
 #include <cstdint>
+#include <cstddef>
 #include <cassert>
 
-#define ALIGNMENT sizeof(void *)
+#define DEFAULT_ALIGNMENT alignof(max_align_t)
 
 class LinearAllocator
 {
@@ -25,17 +26,15 @@ class LinearAllocator
         unsigned char *m_buffer;
 
     public:
-        LinearAllocator(size_t);
+        LinearAllocator(size_t capacity);
         ~LinearAllocator();
-        void *alloc(size_t);
-        void *alloc_noalign(size_t);
-        void resize(size_t);
+        void *alloc(size_t size, size_t alignment = DEFAULT_ALIGNMENT);
+        void resize(size_t capacity);
         void free();
 };
 
 LinearAllocator::LinearAllocator(size_t capacity)
 {
-    assert((ALIGNMENT & (ALIGNMENT-1)) == 0); // Alignment must be a power of two
     m_offset = 0;
     m_capacity = capacity;
     m_buffer = static_cast<unsigned char*>(malloc(capacity));
@@ -46,23 +45,14 @@ LinearAllocator::~LinearAllocator()
     std::free(m_buffer);
 }
 
-void *LinearAllocator::alloc(size_t size)
+void *LinearAllocator::alloc(size_t size, size_t alignment)
 {
-    size_t corrected_offset = (m_offset + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
+    assert((alignment & (alignment - 1)) == 0); // Alignment must be a power of two
+    size_t corrected_offset = (m_offset + alignment - 1) & ~(alignment - 1);
     if (size <= m_capacity - corrected_offset)
     {
         m_offset = corrected_offset + size;
         return &m_buffer[corrected_offset];
-    }
-    return nullptr; // Out of space
-}
-
-void *LinearAllocator::alloc_noalign(size_t size)
-{
-    if (size <= m_capacity - m_offset)
-    {
-        m_offset += size;
-        return &m_buffer[m_offset - size];
     }
     return nullptr; // Out of space
 }

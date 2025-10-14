@@ -15,18 +15,18 @@
     calling free() eventually.
 
     This implementation supports packing all of the data into a contiguous buffer. To make packing more efficient,
-    the total size is tracked across allocations, which, of course, adds overhead. Also, if alloc() is used instead
-    of alloc_noalign(), the packed data will include any padding used to align the addresses, potentially wasting space.
+    the total size is tracked across allocations, which, of course, adds overhead.
 */
 
 #pragma once
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstddef>
 #include <cstdint>
 #include <cassert>
 
-#define ALIGNMENT sizeof(void *)
+#define DEFAULT_ALIGNMENT alignof(max_align_t)
 
 struct ArenaBlock
 {
@@ -44,22 +44,20 @@ class ArenaAllocator
         size_t m_total_size; // So packing is O(n) instead of O(n^2)
 
     public:
-        ArenaAllocator(size_t);
+        ArenaAllocator(size_t capacity);
         ~ArenaAllocator();
-        void *alloc(size_t);
-        void *alloc_noalign(size_t);
+        void *alloc(size_t size, size_t alignment = DEFAULT_ALIGNMENT);
         void reset();
         void free();
-        void *pack(size_t*);
+        void *pack(size_t *packed_size);
 };
 
-ArenaAllocator::ArenaAllocator(size_t initial_capacity)
+ArenaAllocator::ArenaAllocator(size_t capacity)
 {
-    assert((ALIGNMENT & (ALIGNMENT-1)) == 0); // Alignment must be a power of two
-    ArenaBlock *block = static_cast<ArenaBlock *>(malloc(sizeof(ArenaBlock) + initial_capacity));
+    ArenaBlock *block = static_cast<ArenaBlock *>(malloc(sizeof(ArenaBlock) + capacity));
     block->next = nullptr;
     block->offset = 0;
-    block->capacity = initial_capacity;
+    block->capacity = capacity;
     block->buffer = reinterpret_cast<unsigned char *>(block + 1);
     m_head = m_current = block;
     m_total_size = 0;
@@ -76,9 +74,10 @@ ArenaAllocator::~ArenaAllocator()
     }
 }
 
-void *ArenaAllocator::alloc(size_t size)
+void *ArenaAllocator::alloc(size_t size, size_t alignment)
 {
-    size_t corrected_offset = (m_current->offset + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
+    assert((alignment & (alignment - 1)) == 0); // Alignment must be a power of two
+    size_t corrected_offset = (m_current->offset + alignment - 1) & ~(alignment - 1);
     if (size > m_current->capacity - corrected_offset)
     {
         ArenaBlock *new_block = static_cast<ArenaBlock *>(malloc(sizeof(ArenaBlock) + size));
@@ -98,24 +97,6 @@ void *ArenaAllocator::alloc(size_t size)
         m_current->offset = corrected_offset + size;
         return &(m_current->buffer[corrected_offset - size]);
     }
-}
-
-void *ArenaAllocator::alloc_noalign(size_t size)
-{
-    if (size > m_current->capacity - m_current->offset)
-    {
-        ArenaBlock *new_block = static_cast<ArenaBlock *>(malloc(sizeof(ArenaBlock) + size));
-        new_block->next = m_current->next;
-        new_block->offset = 0;
-        new_block->capacity = static_cast<size_t>(std::max(m_current->capacity * 1.5, static_cast<double>(size)));
-        new_block->buffer = reinterpret_cast<unsigned char *>(new_block + 1);
-        m_current->next = new_block;
-        m_current = new_block;
-    }
-
-    m_total_size += size;
-    m_current->offset += size;
-    return &(m_current->buffer[m_current->offset - size]);
 }
 
 void ArenaAllocator::reset()
