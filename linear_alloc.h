@@ -17,8 +17,6 @@
 #include <cstring>
 #include <cassert>
 
-#define DEFAULT_ALIGNMENT alignof(max_align_t)
-
 class LinearAllocator
 {
     private:
@@ -29,7 +27,8 @@ class LinearAllocator
     public:
         LinearAllocator(size_t capacity);
         ~LinearAllocator();
-        void *alloc(size_t size, size_t alignment = DEFAULT_ALIGNMENT);
+        void *alloc(size_t size);
+        void *alloc_align(size_t size, size_t alignment);
         void resize(size_t capacity);
         void free();
 };
@@ -46,9 +45,23 @@ LinearAllocator::~LinearAllocator()
     std::free(m_buffer);
 }
 
-void *LinearAllocator::alloc(size_t size, size_t alignment)
+void *LinearAllocator::alloc(size_t size)
+{
+    constexpr size_t DEFAULT_ALIGNMENT = alignof(max_align_t);
+
+    size_t corrected_offset = (m_offset + DEFAULT_ALIGNMENT - 1) & ~(DEFAULT_ALIGNMENT - 1);
+    if (size <= m_capacity - corrected_offset)
+    {
+        m_offset = corrected_offset + size;
+        return &m_buffer[corrected_offset];
+    }
+    return nullptr; // Out of space
+}
+
+void *LinearAllocator::alloc_align(size_t size, size_t alignment)
 {
     assert((alignment & (alignment - 1)) == 0); // Alignment must be a power of two
+    
     size_t corrected_offset = (m_offset + alignment - 1) & ~(alignment - 1);
     if (size <= m_capacity - corrected_offset)
     {

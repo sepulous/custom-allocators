@@ -27,8 +27,6 @@
 #include <cstring>
 #include <cassert>
 
-#define DEFAULT_ALIGNMENT alignof(max_align_t)
-
 struct ArenaBlock
 {
     ArenaBlock *next;
@@ -47,7 +45,8 @@ class ArenaAllocator
     public:
         ArenaAllocator(size_t capacity);
         ~ArenaAllocator();
-        void *alloc(size_t size, size_t alignment = DEFAULT_ALIGNMENT);
+        void *alloc(size_t size);
+        void *alloc_align(size_t size, size_t alignment);
         void reset();
         void free();
         void *pack(size_t *packed_size);
@@ -75,9 +74,36 @@ ArenaAllocator::~ArenaAllocator()
     }
 }
 
-void *ArenaAllocator::alloc(size_t size, size_t alignment)
+void *ArenaAllocator::alloc(size_t size)
+{
+    constexpr size_t DEFAULT_ALIGNMENT = alignof(max_align_t);
+
+    size_t corrected_offset = (m_current->offset + DEFAULT_ALIGNMENT - 1) & ~(DEFAULT_ALIGNMENT - 1);
+    if (size > m_current->capacity - corrected_offset)
+    {
+        ArenaBlock *new_block = static_cast<ArenaBlock *>(malloc(sizeof(ArenaBlock) + size));
+        new_block->next = m_current->next;
+        new_block->offset = 0;
+        new_block->capacity = static_cast<size_t>(std::max(m_current->capacity * 1.5, (double)size));
+        new_block->buffer = reinterpret_cast<unsigned char *>(new_block + 1);
+        m_current->next = new_block;
+        m_current = new_block;
+        m_current->offset += size;
+        m_total_size += size;
+        return new_block + 1;
+    }
+    else
+    {
+        m_total_size += size + corrected_offset - m_current->offset; // += size + offset shift
+        m_current->offset = corrected_offset + size;
+        return &(m_current->buffer[corrected_offset - size]);
+    }
+}
+
+void *ArenaAllocator::alloc_align(size_t size, size_t alignment)
 {
     assert((alignment & (alignment - 1)) == 0); // Alignment must be a power of two
+
     size_t corrected_offset = (m_current->offset + alignment - 1) & ~(alignment - 1);
     if (size > m_current->capacity - corrected_offset)
     {

@@ -14,8 +14,6 @@
 #include <cstring>
 #include <cassert>
 
-#define DEFAULT_ALIGNMENT alignof(max_align_t)
-
 class StackAllocator
 {
     private:
@@ -26,7 +24,8 @@ class StackAllocator
     public:
         StackAllocator(size_t capacity);
         ~StackAllocator();
-        void *alloc(size_t size, size_t alignment = DEFAULT_ALIGNMENT);
+        void *alloc(size_t size);
+        void *alloc_align(size_t size, size_t alignment);
         size_t get_marker();
         void free_to_marker(size_t offset);
         void resize(size_t capacity);
@@ -45,9 +44,23 @@ StackAllocator::~StackAllocator()
     std::free(m_buffer);
 }
 
-void *StackAllocator::alloc(size_t size, size_t alignment)
+void *StackAllocator::alloc(size_t size)
+{
+    constexpr size_t DEFAULT_ALIGNMENT = alignof(max_align_t);
+
+    size_t corrected_offset = (m_offset + DEFAULT_ALIGNMENT - 1) & ~(DEFAULT_ALIGNMENT - 1);
+    if (size <= m_capacity - corrected_offset)
+    {
+        m_offset = corrected_offset + size;
+        return &m_buffer[corrected_offset];
+    }
+    return nullptr; // Out of space
+}
+
+void *StackAllocator::alloc_align(size_t size, size_t alignment)
 {
     assert((alignment & (alignment - 1)) == 0); // Alignment must be a power of two
+
     size_t corrected_offset = (m_offset + alignment - 1) & ~(alignment - 1);
     if (size <= m_capacity - corrected_offset)
     {
