@@ -38,9 +38,9 @@ struct ArenaBlock
 class ArenaAllocator
 {
     private:
-        ArenaBlock *m_head;
-        ArenaBlock *m_current;
-        size_t m_total_size; // So packing is O(n) instead of O(n^2)
+        ArenaBlock *_head;
+        ArenaBlock *_current;
+        size_t _total_size; // So packing is O(n) instead of O(n^2)
 
     public:
         ArenaAllocator(size_t capacity);
@@ -59,13 +59,13 @@ ArenaAllocator::ArenaAllocator(size_t capacity)
     block->offset = 0;
     block->capacity = capacity;
     block->buffer = reinterpret_cast<unsigned char *>(block + 1);
-    m_head = m_current = block;
-    m_total_size = 0;
+    _head = _current = block;
+    _total_size = 0;
 }
 
 ArenaAllocator::~ArenaAllocator()
 {
-    ArenaBlock *block = m_head;
+    ArenaBlock *block = _head;
     while (block)
     {
         ArenaBlock *next = block->next;
@@ -78,25 +78,25 @@ void *ArenaAllocator::alloc(size_t size)
 {
     constexpr size_t DEFAULT_ALIGNMENT = alignof(max_align_t);
 
-    size_t corrected_offset = (m_current->offset + DEFAULT_ALIGNMENT - 1) & ~(DEFAULT_ALIGNMENT - 1);
-    if (size > m_current->capacity - corrected_offset)
+    size_t corrected_offset = (_current->offset + DEFAULT_ALIGNMENT - 1) & ~(DEFAULT_ALIGNMENT - 1);
+    if (size > _current->capacity - corrected_offset)
     {
         ArenaBlock *new_block = static_cast<ArenaBlock *>(malloc(sizeof(ArenaBlock) + size));
-        new_block->next = m_current->next;
+        new_block->next = _current->next;
         new_block->offset = 0;
-        new_block->capacity = static_cast<size_t>(std::max(m_current->capacity * 1.5, (double)size));
+        new_block->capacity = static_cast<size_t>(std::max(_current->capacity * 1.5, (double)size));
         new_block->buffer = reinterpret_cast<unsigned char *>(new_block + 1);
-        m_current->next = new_block;
-        m_current = new_block;
-        m_current->offset += size;
-        m_total_size += size;
+        _current->next = new_block;
+        _current = new_block;
+        _current->offset += size;
+        _total_size += size;
         return new_block + 1;
     }
     else
     {
-        m_total_size += size + corrected_offset - m_current->offset; // += size + offset shift
-        m_current->offset = corrected_offset + size;
-        return &(m_current->buffer[corrected_offset - size]);
+        _total_size += size + corrected_offset - _current->offset; // += size + offset shift
+        _current->offset = corrected_offset + size;
+        return &(_current->buffer[corrected_offset - size]);
     }
 }
 
@@ -104,64 +104,64 @@ void *ArenaAllocator::alloc_align(size_t size, size_t alignment)
 {
     assert((alignment & (alignment - 1)) == 0); // Alignment must be a power of two
 
-    size_t corrected_offset = (m_current->offset + alignment - 1) & ~(alignment - 1);
-    if (size > m_current->capacity - corrected_offset)
+    size_t corrected_offset = (_current->offset + alignment - 1) & ~(alignment - 1);
+    if (size > _current->capacity - corrected_offset)
     {
         ArenaBlock *new_block = static_cast<ArenaBlock *>(malloc(sizeof(ArenaBlock) + size));
-        new_block->next = m_current->next;
+        new_block->next = _current->next;
         new_block->offset = 0;
-        new_block->capacity = static_cast<size_t>(std::max(m_current->capacity * 1.5, (double)size));
+        new_block->capacity = static_cast<size_t>(std::max(_current->capacity * 1.5, (double)size));
         new_block->buffer = reinterpret_cast<unsigned char *>(new_block + 1);
-        m_current->next = new_block;
-        m_current = new_block;
-        m_current->offset += size;
-        m_total_size += size;
+        _current->next = new_block;
+        _current = new_block;
+        _current->offset += size;
+        _total_size += size;
         return new_block + 1;
     }
     else
     {
-        m_total_size += size + corrected_offset - m_current->offset; // += size + offset shift
-        m_current->offset = corrected_offset + size;
-        return &(m_current->buffer[corrected_offset - size]);
+        _total_size += size + corrected_offset - _current->offset; // += size + offset shift
+        _current->offset = corrected_offset + size;
+        return &(_current->buffer[corrected_offset - size]);
     }
 }
 
 void ArenaAllocator::reset()
 {
-    ArenaBlock *block = m_head;
+    ArenaBlock *block = _head;
     while (block)
     {
         block->offset = 0;
         block = block->next;
     }
-    m_current = m_head;
-    m_total_size = 0;
+    _current = _head;
+    _total_size = 0;
 }
 
 void ArenaAllocator::free()
 {
-    ArenaBlock *block = m_head->next;
+    ArenaBlock *block = _head->next;
     while (block)
     {
         ArenaBlock *next = block->next;
         std::free(block);
         block = next;
     }
-    m_head->offset = 0;
-    m_head->next = nullptr;
-    m_current = m_head;
-    m_total_size = 0;
+    _head->offset = 0;
+    _head->next = nullptr;
+    _current = _head;
+    _total_size = 0;
 }
 
 void *ArenaAllocator::pack(size_t *packed_size)
 {
-    if (m_total_size == 0)
+    if (_total_size == 0)
         return nullptr;
 
-    unsigned char *packed_buffer = static_cast<unsigned char *>(malloc(m_total_size));
-    *packed_size = m_total_size;
+    unsigned char *packed_buffer = static_cast<unsigned char *>(malloc(_total_size));
+    *packed_size = _total_size;
 
-    ArenaBlock *block = m_head;
+    ArenaBlock *block = _head;
     unsigned char *packed_buffer_ptr = packed_buffer;
     while (block)
     {
