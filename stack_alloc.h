@@ -79,7 +79,7 @@ size_t StackAllocator::get_offset()
 
 void StackAllocator::free_to_offset(size_t offset)
 {
-    assert(offset >= 0 && offset < _capacity); // Could replace _capacity with _offset
+    assert(offset >= 0 && offset < _offset);
     _offset = offset;
 }
 
