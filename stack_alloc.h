@@ -1,7 +1,8 @@
 /*
     The stack allocator is a modified linear allocator that allows freeing allocations in reverse order,
-    rather than having to free the entire block at once. This is essentially accomplished by adding
-    getter and setter functions for the offset.
+    rather than having to free the entire block at once. Here, this is accomplished by adding getter and
+    setter functions for the offset. This is more efficient than storing a header at the start of each
+    allocation, as some implementations do.
 
     Allocation is performed in amortized O(1) time.
 */
@@ -26,8 +27,8 @@ class StackAllocator
         ~StackAllocator();
         void *alloc(size_t size);
         void *alloc_align(size_t size, size_t alignment);
-        size_t get_marker();
-        void free_to_marker(size_t offset);
+        size_t get_offset();
+        void free_to_offset(size_t offset);
         void resize(size_t capacity);
         void free_all();
 };
@@ -77,7 +78,7 @@ size_t StackAllocator::get_marker()
 
 void StackAllocator::free_to_marker(size_t offset)
 {
-    assert(offset >= 0 && offset < _capacity);
+    assert(offset >= 0 && offset < _capacity); // Could replace _capacity with _offset
     _offset = offset;
 }
 
