@@ -71,12 +71,12 @@ void *StackAllocator::alloc_align(size_t size, size_t alignment)
     return nullptr; // Out of space
 }
 
-size_t StackAllocator::get_marker()
+size_t StackAllocator::get_offset()
 {
     return _offset;
 }
 
-void StackAllocator::free_to_marker(size_t offset)
+void StackAllocator::free_to_offset(size_t offset)
 {
     assert(offset >= 0 && offset < _capacity); // Could replace _capacity with _offset
     _offset = offset;
