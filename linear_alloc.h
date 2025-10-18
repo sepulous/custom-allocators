@@ -13,7 +13,6 @@
 #define LINEAR_ALLOC_H
 
 #include <cstdlib>
-#include <cstdint>
 #include <cstddef>
 #include <cstring>
 #include <cassert>

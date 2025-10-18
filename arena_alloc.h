@@ -12,7 +12,8 @@
     this is instead handled by creating a larger block and copying the data over). These new blocks
     are inserted after the current block, which means that if there are already existing blocks after
     the current block (because reset() was called), a memory leak results, which must be managed by
-    calling free() eventually.
+    calling free() eventually. This is done to keep block creation simple (avoiding looking for
+    existing blocks).
 
     This implementation supports packing all of the data into a contiguous buffer. To make packing more efficient,
     the total size is tracked across allocations, which, of course, adds overhead.
@@ -24,7 +25,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstddef>
-#include <cstdint>
 #include <cstring>
 #include <cassert>
 
