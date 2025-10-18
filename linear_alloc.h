@@ -9,7 +9,8 @@
     which grows dynamically.
 */
 
-#pragma once
+#ifndef LINEAR_ALLOC_H
+#define LINEAR_ALLOC_H
 
 #include <cstdlib>
 #include <cstdint>
@@ -87,3 +88,5 @@ void LinearAllocator::free()
 {
     _offset = 0;
 }
+
+#endif

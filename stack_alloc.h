@@ -7,7 +7,8 @@
     Allocation is performed in amortized O(1) time.
 */
 
-#pragma once
+#ifndef STACK_ALLOC_H
+#define STACK_ALLOC_H
 
 #include <cstdlib>
 #include <cstdint>
@@ -98,3 +99,5 @@ void StackAllocator::free_all()
 {
     _offset = 0;
 }
+
+#endif

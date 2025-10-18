@@ -18,7 +18,8 @@
     the total size is tracked across allocations, which, of course, adds overhead.
 */
 
-#pragma once
+#ifndef ARENA_ALLOC_H
+#define ARENA_ALLOC_H
 
 #include <algorithm>
 #include <cstdlib>
@@ -172,3 +173,5 @@ void *ArenaAllocator::pack(size_t *packed_size)
 
     return packed_buffer;
 }
+
+#endif
